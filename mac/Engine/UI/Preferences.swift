@@ -307,6 +307,17 @@ final class PreferencesWindow: NSWindowController, NSWindowDelegate {
         ])
         addTab(tabs, "Movement", move)
 
+        let workTab = grid([
+            ("", check("Change behaviour with my work state (from the State Space)", s.workAware) { S.workAware = $0 }),
+            ("On task: get out of the way", slider(s.focusStrength, 0, 1, fmt: { "\(Int($0 * 100))%" }) { v in S.focusStrength = v }),
+            ("Off task: get hyperactive", slider(s.hyperStrength, 0, 1, fmt: { "\(Int($0 * 100))%" }) { v in S.hyperStrength = v }),
+            ("React after", slider(s.distractDwell, 5, 300, fmt: { "\(Int($0)) s off task" }) { v in S.distractDwell = v }),
+            ("Check my work state every", slider(s.workCheckSeconds, 1, 30, fmt: { "\(Int($0)) s" }) { v in S.workCheckSeconds = v }),
+            ("Off task means", check("media & social windows (YouTube, Twitter…) and windows far from every note", !s.strictOffTask) { S.strictOffTask = !$0 }),
+            ("", check("Strict: any window not linked to a note", s.strictOffTask) { S.strictOffTask = $0 }),
+        ])
+        addTab(tabs, "Work", workTab)
+
         let phys = grid([
             ("Gravity", slider(s.gravity, 0.2, 1.5, fmt: { self.num($0) }) { v in S.gravity = v }),
             ("Bounciness", slider(s.bounciness, 0, 0.95, fmt: { self.num($0) }) { v in S.bounciness = v }),

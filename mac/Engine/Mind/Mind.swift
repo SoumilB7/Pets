@@ -63,15 +63,25 @@ final class Mind {
     func start() {
         guard MindSettings.enabled else { Log.w("state-space", "disabled in settings"); return }
         Log.w("state-space", "starting · embedder \(embedder.name) \(embedder.dim)-d · local vectors: \((try? local.count("windows")) ?? 0) windows, \((try? local.count("tasks")) ?? 0) tasks")
-        // the embedding recipe changed: rebuild every vector and reset the threshold to the new scale
-        let recipe = 3
+        // the embedding recipe changed: re-embed every window node in place from what we stored
+        // about it (app, title, url, text sample), and let tasks re-embed from the board
+        let recipe = 4
         if UserDefaults.standard.integer(forKey: "mind.recipe") != recipe {
-            let w = local.all("windows").map { $0.id }, t = local.all("tasks").map { $0.id }
-            if !w.isEmpty { try? local.delete("windows", ids: w) }
-            if !t.isEmpty { try? local.delete("tasks", ids: t) }
-            UserDefaults.standard.removeObject(forKey: "mind.threshold")
-            UserDefaults.standard.set(recipe, forKey: "mind.recipe")
-            Log.w("store", "embedding recipe v\(recipe) (\(embedder.name)): cleared \(w.count) window + \(t.count) task vectors; threshold reset to \(MindSettings.threshold)")
+            queue.async { [self] in
+                var redone: [Point] = []
+                for var p in local.all("windows") {
+                    let pl = p.payload
+                    let head = Snapshot.headText(app: pl["app"] ?? "", bundle: pl["bundle"] ?? "", category: pl["category"] ?? "", title: pl["title"] ?? "", url: pl["url"] ?? "", document: pl["document"] ?? "")
+                    if let v = Embed.window(embedder, head: head, text: pl["textSample"] ?? "") { p.vector = v; p.payload["hash"] = ""; redone.append(p) }
+                }
+                if !redone.isEmpty { try? local.upsert("windows", redone) }
+                let t = local.all("tasks").map { $0.id }
+                if !t.isEmpty { try? local.delete("tasks", ids: t) }
+                UserDefaults.standard.removeObject(forKey: "mind.threshold")
+                UserDefaults.standard.set(recipe, forKey: "mind.recipe")
+                Log.w("store", "embedding recipe v\(recipe) (\(embedder.name)): re-embedded \(redone.count) window nodes in place; tasks re-embed; threshold \(MindSettings.threshold)")
+                embedTasks(); refresh(trigger: "recipe")
+            }
         }
         // vectors from a different embedder can't be compared: start over if the dimension changed
         if let any = local.all("windows").first ?? local.all("tasks").first, any.vector.count != embedder.dim {
@@ -252,11 +262,11 @@ final class Mind {
         payload["desktop"] = String(s.desktop); payload["lastSeen"] = iso.string(from: s.time)
         payload["seenCount"] = String((Int(payload["seenCount"] ?? "0") ?? 0) + 1)
         if payload["firstSeen"] == nil { payload["firstSeen"] = payload["lastSeen"] }
-        if !s.text.isEmpty { payload["textSample"] = String(s.text.prefix(300)) }
+        if !s.text.isEmpty { payload["textSample"] = String(s.text.prefix(600)) }
         var vector = existing?.vector ?? []
         if existing == nil || payload["hash"] != s.hash || vector.isEmpty {
             let t0 = Date()
-            guard let v = embedder.embed(s.embedText) else { Log.w("embed", "no vector for \(s.app) “\(s.title)” (empty text?)"); return }
+            guard let v = Embed.window(embedder, head: s.headText, text: s.text) else { Log.w("embed", "no vector for \(s.app) “\(s.title)” (empty text?)"); return }
             vector = v
             payload["hash"] = s.hash
             Log.w("embed", "\(source): \(s.app) “\(s.title.prefix(60))” \(s.text.isEmpty ? "title only" : "\(s.text.count) chars") · \(Int(Date().timeIntervalSince(t0) * 1000)) ms")
@@ -328,7 +338,20 @@ final class Mind {
         if !points.isEmpty { try? local.upsert("tasks", points); if let r = remote, r.reachable { try? r.upsert("tasks", points) } }
     }
 
+    /// An app's title-less placeholder node is only useful until a real titled window of
+    /// that app exists; after that it just adds generic-description noise. Drop them.
+    private func pruneUntitled() {
+        let all = local.all("windows")
+        let titled = Set(all.filter { !($0.payload["title"] ?? "").isEmpty || !($0.payload["url"] ?? "").isEmpty }.compactMap { $0.payload["bundle"] })
+        let stale = all.filter { ($0.payload["title"] ?? "").isEmpty && ($0.payload["url"] ?? "").isEmpty && titled.contains($0.payload["bundle"] ?? "") }.map { $0.id }
+        guard !stale.isEmpty else { return }
+        try? local.delete("windows", ids: stale)
+        if let r = remote, r.reachable { try? r.delete("windows", ids: stale) }
+        Log.w("store", "pruned \(stale.count) title-less placeholder node(s) superseded by titled windows")
+    }
+
     private func refresh(trigger: String) {
+        pruneUntitled()
         let tasks = TaskStore.shared.open
         if taskVectors.isEmpty && !tasks.isEmpty { embedTasks() }
         do {

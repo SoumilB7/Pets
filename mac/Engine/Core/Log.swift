@@ -21,6 +21,8 @@ import Foundation
 //   throw    you threw it
 //   impact   hard hit → dizzy
 //   pos      position heartbeat every 10 s (x, y, ledge, activity)
+//   work     on task / off task / neutral transitions (with the note and score)
+//   mood     the pet's reaction to a work-state change
 //   warn     something unexpected but survivable
 //   crash    fatal signal / uncaught exception (last line of a bad run)
 

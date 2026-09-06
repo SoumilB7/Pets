@@ -22,16 +22,20 @@ struct Snapshot: Codable {
     var hash: String              // sha256 of embedText
     var time: Date
 
-    /// What gets embedded. Starts with what the app IS (so "Code" means programming even
-    /// when no window title is available), then the title / url, then sampled text.
-    var embedText: String {
+    /// The part that identifies the window: app (+ a short note on what it is), title, url.
+    /// With no title, the full app description stands in so the node still means something.
+    var headText: String { Snapshot.headText(app: app, bundle: bundle, category: category, title: title, url: url, document: document) }
+    static func headText(app: String, bundle: String, category: String, title: String, url: String, document: String) -> String {
         var head = app
-        let what = AppKnowledge.describe(bundle: bundle, app: app, category: category)
+        let what = title.isEmpty && url.isEmpty ? AppKnowledge.describe(bundle: bundle, app: app, category: category)
+                                                : AppKnowledge.short(bundle: bundle, app: app, category: category)
         if !what.isEmpty { head += " — " + what }
         if !title.isEmpty { head += " · " + title }
         if !url.isEmpty { head += " · " + url } else if !document.isEmpty { head += " · " + document }
-        return text.isEmpty ? head : head + "\n" + text
+        return head
     }
+    /// Content identity (hash) — head plus sampled text.
+    var embedText: String { text.isEmpty ? headText : headText + "\n" + text }
 }
 
 /// What common apps are for, in plain words. Feeds the embedding so app nodes carry
@@ -67,6 +71,23 @@ enum AppKnowledge {
         "com.anthropic.claudefordesktop": "Claude, AI assistant chat, asking questions, writing and coding help",
         "com.apple.systempreferences": "System Settings, macOS preferences, permissions, configuration",
     ]
+    /// Two or three words, used next to a real title so the app type still counts a little.
+    static func short(bundle: String, app: String, category: String) -> String {
+        if bundle.hasPrefix("com.apple.finder") { return "files and folders" }
+        if bundle.hasPrefix("com.apple.systempreferences") { return "macOS settings" }
+        switch category {
+        case "code": return "code editor"
+        case "terminal": return "terminal"
+        case "browser": return "web browser"
+        case "chat": return "chat"
+        case "docs": return "notes"
+        case "media": return "media"
+        case "social": return "social"
+        case "design": return "design"
+        default: return ""
+        }
+    }
+
     static func describe(bundle: String, app: String, category: String) -> String {
         if let s = byBundle.first(where: { bundle.hasPrefix($0.key) })?.value { return s }
         if app.lowercased().contains("whatsapp") { return byBundle["net.whatsapp.WhatsApp"]! }
@@ -85,7 +106,7 @@ enum AppKnowledge {
 }
 
 enum Capture {
-    static let maxChars = 2000, maxNodes = 300, maxMs = 150.0
+    static let maxChars = 600, maxNodes = 300, maxMs = 150.0
     static let textRoles: Set<String> = ["AXStaticText", "AXTextArea", "AXTextField", "AXHeading", "AXLink", "AXCell", "AXMenuItem"]
 
     // MARK: ids & hashes

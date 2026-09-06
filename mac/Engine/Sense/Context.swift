@@ -73,7 +73,7 @@ enum Context {
                 let winEl = win as! AXUIElement
                 c.title = (attr(winEl, kAXTitleAttribute) as? String) ?? ""
                 if let doc = attr(winEl, kAXDocumentAttribute) as? String { c.document = doc }
-                if isBrowser(c.bundle) { c.url = findURL(in: winEl) }
+                if isBrowser(c.bundle) { c.url = Context.cleanURL(findURL(in: winEl)) }
             }
         }
         c.category = classify(bundle: c.bundle, app: c.app, url: c.url, title: c.title)
@@ -122,8 +122,25 @@ enum Context {
          "company.thebrowser.Browser", "com.microsoft.edgemac", "com.vivaldi.Vivaldi", "com.operasoftware.Opera"].contains { b.hasPrefix($0) }
     }
 
+    /// Strip whitespace / control / invisible characters that address bars sometimes carry.
+    static func cleanURL(_ s: String) -> String {
+        let bad = CharacterSet.whitespacesAndNewlines.union(.controlCharacters).union(CharacterSet(charactersIn: "\u{200E}\u{200F}\u{200B}\u{FEFF}"))
+        return String(s.unicodeScalars.filter { !bad.contains($0) })
+    }
+
+    /// Host of a URL, tolerant of strings URL(string:) rejects.
+    static func host(of url: String) -> String {
+        let u = cleanURL(url)
+        if let h = URL(string: u)?.host?.lowercased(), !h.isEmpty { return h }
+        if let r = u.range(of: "://") {
+            let rest = u[r.upperBound...]
+            return String(rest.prefix { $0 != "/" && $0 != "?" && $0 != "#" }).lowercased()
+        }
+        return ""
+    }
+
     static func classify(bundle b: String, app: String, url: String, title: String) -> Category {
-        let host = URL(string: url)?.host?.lowercased() ?? ""
+        let host = host(of: url)
         if !host.isEmpty {
             if ["youtube.", "netflix.", "twitch.", "primevideo.", "hulu.", "spotify."].contains(where: host.contains) { return .media }
             if ["twitter.", "x.com", "reddit.", "instagram.", "facebook.", "tiktok.", "threads."].contains(where: host.contains) { return .social }

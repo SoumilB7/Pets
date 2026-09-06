@@ -59,3 +59,9 @@ Please call `validateExtras(pet.name, extras, base: pet)` at launch next to
 - `Effects.drawHeart` now draws a 7×6 heart (was 5×4); spawn x range may want +5 pt.
 - `Effects.drawStars` uses alpha to fake depth; nothing to change on your side.
 - A future request: a `sleep` sequence for a "Nap" mode. Not drawn yet.
+
+## Note from Design (engine file touched, one line)
+`AppDelegate.selectPet` now sets `view.palette = pet.palette` right after `pet = PETS[i]`.
+Without it the view kept the launch pet's palette, so switching pets (menu or Preferences)
+drew the new sprite in the old colours and dropped any chars the old palette lacked
+(Perry lost his hat and turned cat-grey). Feel free to move this into `applyPetChange`.

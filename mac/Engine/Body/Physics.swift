@@ -40,6 +40,7 @@ extension AppDelegate {
         tickCount += 1
         if tickCount % 60 == 0 {                                       // once a second, all modes
             Context.refresh(windowCount: platforms.filter { !$0.isFloor }.count)
+            if tickCount % (60 * max(1, Int(S.workCheckSeconds))) == 0 { updateWork() }
             sampleState()
             if tickCount % 600 == 0 && mode == .normal { logPosition() }
         }
@@ -75,7 +76,7 @@ extension AppDelegate {
             // The pet is on another desktop. It waits there; every so often it decides to come find you.
             if now >= nextDesktopMove {
                 nextDesktopMove = now.addingTimeInterval(S.desktopEvery * Double.random(in: 0.8...1.5))
-                if Double.random(in: 0..<1) < Double(S.returnToMe) / 100 {
+                if Double.random(in: 0..<1) < Double(mood.returnToMe) / 100 {
                     let ci = Spaces.index(of: petSpace) ?? 0, ui = Spaces.index(of: userSpace) ?? 0
                     Log.w("space", "coming to find you on desktop \(userSpace)")
                     arrive(at: userSpace, fromLeft: ui >= ci)
@@ -177,7 +178,7 @@ extension AppDelegate {
             }
             let dx = targetX - x
             if abs(dx) > 0.5 {
-                let base = CGFloat(S.walkSpeed)
+                let base = CGFloat(S.walkSpeed * mood.speedScale)
                 let step = min(abs(dx), abs(dx) > 400 ? base * 1.8 : base)
                 x += dx > 0 ? step : -step
                 view.flip = dx < 0

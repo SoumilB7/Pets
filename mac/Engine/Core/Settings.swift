@@ -72,6 +72,15 @@ struct PetSettings: Codable {
     var pFloor: Int = 10               // % chance to hop down to the floor
     var cursorCuriosity: Int = 15      // % of "wander along" moves that approach the cursor
 
+    // work awareness (State Space → mood)
+    var workAware: Bool = true            // bend behaviour by whether you're on a note or drifting
+    var focusStrength: Double = 1.0       // 0…1: how hard it gets out of the way when you're on task
+    var hyperStrength: Double = 1.0       // 0…1: how hyperactive it gets when you're off task
+    var distractDwell: Double = 45        // seconds off task before it reacts
+    var workCheckSeconds: Double = 3      // how often the work state is re-evaluated
+    var distractionCategories: [String] = ["media", "social"]
+    var strictOffTask: Bool = false       // treat ANY window not linked to a note as off task
+
     // physics
     var gravity: Double = 0.6
     var bounciness: Double = 0.45      // restitution used for throws (and hops)

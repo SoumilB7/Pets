@@ -35,6 +35,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var pendingDir = 1                 // +1 = leave via right edge, -1 = left
     var lastSpaceChange = Date.distantPast
     var lastMoving = false             // for state sampling
+    let work = WorkStateDetector()
+    var mood: Mood = Mood.neutral(PetSettings())
+
+    /// Re-evaluate the work state (once a second) and bend the pet's mood accordingly.
+    func updateWork() {
+        let s = S
+        let changed = work.evaluate(context: Context.current, now: Mind.shared.graph?.now, openTasks: TaskStore.shared.open.count,
+                                    threshold: Float(MindSettings.threshold), s: s)
+        let newMood: Mood
+        switch (s.workAware, work.current.state) {
+        case (true, .onTask): newMood = Mood.focused(s, k: s.focusStrength)
+        case (true, .offTask): newMood = Mood.distracted(s, k: s.hyperStrength)
+        default: newMood = Mood.neutral(s)
+        }
+        let moodChanged = newMood.name != mood.name
+        mood = newMood
+        if let c = changed {
+            Log.w("work", "\(c.rawValue): \(work.current.reason) → mood \(mood.name)")
+        }
+        if moodChanged {
+            syncMenu()
+            // whatever it was planning belonged to the old mood: drop it and decide afresh
+            pendingClimb = nil; pendingJump = nil; pendingSpace = nil
+            if standing != nil { targetX = x }
+            Log.w("mood", "\(mood.name): dropped pending plans, re-deciding")
+            switch mood.name {
+            case "distracted":
+                // come over right now and start bugging
+                if Spaces.available && petSpace != userSpace {
+                    let ci = Spaces.index(of: petSpace) ?? 0, ui = Spaces.index(of: userSpace) ?? 0
+                    arrive(at: userSpace, fromLeft: ui >= ci)
+                    Log.w("mood", "distracted → came to your desktop")
+                }
+                pendingSpace = nil
+                nextWander = Date().addingTimeInterval(0.5)
+            case "focused":
+                // leave soon
+                nextWander = Date().addingTimeInterval(2)
+                nextDesktopMove = min(nextDesktopMove, Date().addingTimeInterval(3))
+            default: break
+            }
+        }
+    }
 
     /// One word describing what the pet is doing right now (for the state log).
     var activity: String {
@@ -61,7 +104,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func sampleState() {
         let c = Context.current
-        let u = UserState(desktop: userSpace, app: c.app, bundle: c.bundle, title: c.title, url: c.url, category: c.category.rawValue, idleSeconds: c.idleSeconds)
+        let u = UserState(desktop: userSpace, app: c.app, bundle: c.bundle, title: c.title, url: c.url, category: c.category.rawValue, idleSeconds: c.idleSeconds, work: work.current.state.rawValue)
         var p = PetState()
         p.desktop = petSpace
         p.mode = mode.short
@@ -277,7 +320,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         petMenu.submenu?.items.forEach { $0.state = $0.tag == Settings.shared.petIndex ? .on : .off }
         modeMenu.title = "Mode: \(mode.short)"
         modeMenu.submenu?.items.forEach { $0.state = $0.tag == mode.rawValue ? .on : .off }
-        statusItem.button?.title = mode == .chill ? "☕️" : (mode == .action ? "🫥" : "🐾")
+        statusItem.button?.title = mode == .chill ? "☕️" : (mode == .action ? "🫥" : mood.icon)
+        statusItem.button?.toolTip = "PixelPet · \(work.summary)"
     }
 
     @objc func chooseMode(_ sender: NSMenuItem) { setMode(Mode(rawValue: sender.tag) ?? .normal) }
@@ -329,6 +373,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func selectPet(_ i: Int) {
         Settings.shared.petIndex = i
         pet = PETS[i]
+        view.palette = pet.palette      // the view caches the palette; refresh it or the new pet wears the old colours
         Log.w("app", "pet → \(pet.name)")
         applyPetChange()
     }

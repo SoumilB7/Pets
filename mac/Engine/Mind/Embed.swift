@@ -14,6 +14,13 @@ protocol Embedder: AnyObject {
 }
 
 enum Embed {
+    /// Title-led window vector: the head (app · title · url) carries 0.8, sampled text 0.2.
+    /// Measured: keeps a project's own window above the line and other projects below it.
+    static func window(_ e: Embedder, head: String, text: String) -> [Float]? {
+        guard let h = e.embed(head) else { return nil }
+        guard !text.isEmpty, let t = e.embed(text) else { return h }
+        return normalize(zip(h, t).map { $0 * 0.8 + $1 * 0.2 })
+    }
     static func normalize(_ v: [Float]) -> [Float] {
         let n = sqrt(v.reduce(0) { $0 + $1 * $1 })
         return n > 0 ? v.map { $0 / n } : v

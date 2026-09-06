@@ -70,7 +70,7 @@ enum Link {
         if let c = current, let p = local.get("windows", c.id) {
             let hits = try store.search("tasks", vector: c.vector, limit: 3, filter: [:])
             nowInfo = NowInfo(windowId: c.id, app: p.payload["app"] ?? "", title: p.payload["title"] ?? "",
-                              tasks: hits.filter { $0.score >= threshold * 0.8 }.map { NowTask(taskId: $0.id, title: $0.payload["title"] ?? "", score: $0.score) })
+                              tasks: hits.map { NowTask(taskId: $0.id, title: $0.payload["title"] ?? "", score: $0.score) })
         }
         // windows shown: everything linked + the 60 most recent, capped
         var nodes = local.all("windows").map(windowNode(from:))

@@ -23,6 +23,7 @@ struct UserState: Equatable, Codable {
     var url = ""
     var category = "unknown"
     var idleSeconds = 0
+    var work = "neutral"           // onTask | offTask | neutral | away
 }
 
 struct WorldState: Codable {
@@ -68,7 +69,7 @@ enum StateLog {
         var pu = lastUser, pp = lastPet
         pu.desktop = u.desktop; pp.x = p.x; pp.y = p.y; pp.desktop = p.desktop   // ignore for change detection below
         let changed = !started
-            || u.app != lastUser.app || u.title != lastUser.title || u.url != lastUser.url || u.desktop != lastUser.desktop
+            || u.app != lastUser.app || u.title != lastUser.title || u.url != lastUser.url || u.desktop != lastUser.desktop || u.work != lastUser.work
             || p.ledgeId != lastPet.ledgeId || p.activity != lastPet.activity || p.mode != lastPet.mode || p.desktop != lastPet.desktop
         let idleFlip = (u.idleSeconds >= 120) != (lastUser.idleSeconds >= 120)
         let heartbeat = now.timeIntervalSince(lastWrite) >= 30
@@ -83,7 +84,7 @@ enum StateLog {
         if changed {
             let where_ = p.activity == "away" ? "away on desktop \(p.desktop)"
                 : (p.ledgeId == 0 ? "in the air" : "on \(p.ledgeOwner)\(p.ledgeId > 0 ? "#\(p.ledgeId)" : "")")
-            Log.w("state", "you: \(u.app.isEmpty ? "?" : u.app)\(u.title.isEmpty ? "" : " “\(u.title)”") [\(u.category)]\(u.idleSeconds >= 120 ? " idle \(u.idleSeconds / 60)m" : "") desktop \(u.desktop) | pet: \(where_), \(p.activity), desktop \(p.desktop)\(w.sameDesktop ? "" : " (elsewhere)")\(w.sameWindow ? " (same window as you)" : "") | mode \(p.mode)")
+            Log.w("state", "you: \(u.app.isEmpty ? "?" : u.app)\(u.title.isEmpty ? "" : " “\(u.title)”") [\(u.category)] \(u.work)\(u.idleSeconds >= 120 ? " idle \(u.idleSeconds / 60)m" : "") desktop \(u.desktop) | pet: \(where_), \(p.activity), desktop \(p.desktop)\(w.sameDesktop ? "" : " (elsewhere)")\(w.sameWindow ? " (same window as you)" : "") | mode \(p.mode)")
         }
         if let data = try? JSONEncoder().encode(w) {
             handle?.write(data)

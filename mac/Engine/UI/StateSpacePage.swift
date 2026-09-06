@@ -202,12 +202,15 @@ final class StateSpacePage: NSView {
             graph.set(SpaceGraph(updatedAt: Date(), trigger: "none", tasks: [], windows: [], edges: [], now: nil, storeLabel: "local", vectorCount: 0, millis: 0), tasks: live)
             return
         }
+        let work = (NSApp.delegate as? AppDelegate)?.work.summary ?? ""
         if let n = g.now {
-            nowLabel.stringValue = n.tasks.isEmpty
-                ? "\(n.app) · \(n.title.isEmpty ? "(no title)" : n.title)  →  no note close enough"
-                : "\(n.app) · \(n.title.isEmpty ? "(no title)" : n.title)  →  " + n.tasks.map { "\($0.title) (\(String(format: "%.2f", $0.score)))" }.joined(separator: "  ·  ")
+            let close = n.tasks.filter { $0.score >= Float(MindSettings.threshold) }
+            let line = close.isEmpty
+                ? "\(n.app) · \(n.title.isEmpty ? "(no title)" : n.title)  →  no note close enough" + (n.tasks.first.map { " (closest: \($0.title) \(String(format: "%.2f", $0.score)))" } ?? "")
+                : "\(n.app) · \(n.title.isEmpty ? "(no title)" : n.title)  →  " + close.map { "\($0.title) (\(String(format: "%.2f", $0.score)))" }.joined(separator: "  ·  ")
+            nowLabel.stringValue = line + (work.isEmpty ? "" : "\n" + work)
         } else {
-            nowLabel.stringValue = "…"
+            nowLabel.stringValue = work.isEmpty ? "…" : work
         }
         graph.set(g, tasks: live)   // live tasks: a note just added shows before its links arrive
 
