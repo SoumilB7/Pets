@@ -187,8 +187,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         y = floorY
         targetX = x
 
-        window = NSWindow(contentRect: NSRect(x: x, y: y, width: WIN_W, height: WIN_H),
-                          styleMask: .borderless, backing: .buffered, defer: false)
+        // A non-activating panel: clicking the pet never activates the app, so the settings
+        // window (if open) stays where it is instead of jumping to the front.
+        window = NSPanel(contentRect: NSRect(x: x, y: y, width: WIN_W, height: WIN_H),
+                         styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         window.isOpaque = false
         window.backgroundColor = .clear
         window.hasShadow = false
