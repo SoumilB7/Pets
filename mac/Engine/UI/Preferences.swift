@@ -31,23 +31,12 @@ final class SpritePreview: NSView {
 final class PreferencesWindow: NSWindowController, NSWindowDelegate {
     var handlers: [Handler] = []
     weak var app: AppDelegate?
-    enum Page: Int, CaseIterable { case pet, tasks, space
-        var title: String { ["Pet", "Tasks", "State Space"][rawValue] }
-        var icon: String { ["🐾", "🗒️", "🕸️"][rawValue] }
-    }
-    var page: Page = Page(rawValue: UserDefaults.standard.integer(forKey: "ui.page")) ?? .pet
-    private var contentHost = NSView()
-    private var sideButtons: [NSButton] = []
-    private var tasksPage: TasksPage?
-    private var spacePage: StateSpacePage?
-    var contextLabel: NSTextField?
-    var contextTimer: Timer?
 
     init(app: AppDelegate) {
         self.app = app
-        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 980, height: 700),
+        let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 660),
                          styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
-        w.minSize = NSSize(width: 820, height: 560)
+        w.minSize = NSSize(width: 600, height: 560)
         w.title = "PixelPet"
         // follow the user: appear on whatever desktop / fullscreen app is active when opened
         w.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
@@ -65,32 +54,7 @@ final class PreferencesWindow: NSWindowController, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
-        contextTimer?.invalidate()
-        contextTimer = nil
         app?.mainWindowClosed()
-    }
-
-    func startContextTimer() {
-        contextTimer?.invalidate()
-        contextTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            let c = Context.current
-            self?.contextLabel?.stringValue = """
-            App: \(c.app)  (\(c.bundle))
-            Category: \(c.category.rawValue)
-            Window: \(c.title.isEmpty ? "—" : c.title)
-            Document: \(c.document.isEmpty ? "—" : c.document)
-            URL: \(c.url.isEmpty ? "—" : c.url)
-            Idle: \(c.idleSeconds) s
-            Windows the pet can see: \(c.windowCount)
-            Accessibility access: \(Context.accessibilityGranted ? "granted" : "not granted (titles / URLs unavailable)")
-
-            You are on desktop: \(StateLog.current?.user.desktop ?? 0)
-            Pet is on desktop:  \(StateLog.current?.pet.desktop ?? 0)\((StateLog.current?.sameDesktop ?? true) ? "" : "  (elsewhere)")
-            Pet stands on:      \(StateLog.current.map { $0.pet.ledgeId == 0 ? "nothing (in the air)" : "\($0.pet.ledgeOwner)\($0.pet.ledgeId > 0 ? " #\($0.pet.ledgeId)" : "")" } ?? "—")\((StateLog.current?.sameWindow ?? false) ? "  (your window)" : "")
-            Pet activity:       \(StateLog.current?.pet.activity ?? "—")
-            """
-        }
-        contextTimer?.fire()
     }
 
     // MARK: building blocks
@@ -160,72 +124,14 @@ final class PreferencesWindow: NSWindowController, NSWindowDelegate {
 
     // MARK: layout
 
-    /// The whole window: a sidebar on the left, the chosen page on the right.
+    /// The window is the Pet page.
     func rebuild() {
         guard let w = window else { return }
-        let split = NSStackView()
-        split.orientation = .horizontal
-        split.alignment = .top
-        split.spacing = 0
-        split.translatesAutoresizingMaskIntoConstraints = false
-
-        let side = NSStackView()
-        side.orientation = .vertical
-        side.alignment = .leading
-        side.spacing = 4
-        side.edgeInsets = NSEdgeInsets(top: 18, left: 12, bottom: 12, right: 12)
-        side.wantsLayer = true
-        side.layer?.backgroundColor = NSColor.windowBackgroundColor.blended(withFraction: 0.06, of: .labelColor)?.cgColor
-        side.translatesAutoresizingMaskIntoConstraints = false
-        side.widthAnchor.constraint(equalToConstant: 168).isActive = true
-        let brand = NSTextField(labelWithString: "PixelPet")
-        brand.font = .monospacedSystemFont(ofSize: 13, weight: .bold)
-        side.addArrangedSubview(brand)
-        side.setCustomSpacing(14, after: brand)
-        sideButtons = []
-        for p in Page.allCases {
-            let b = bind(NSButton(title: "\(p.icon)  \(p.title)", target: nil, action: nil)) { [weak self] _ in self?.show(p) }
-            b.bezelStyle = .inline
-            b.alignment = .left
-            b.font = .systemFont(ofSize: 13, weight: p == page ? .semibold : .regular)
-            b.widthAnchor.constraint(equalToConstant: 144).isActive = true
-            b.tag = p.rawValue
-            side.addArrangedSubview(b)
-            sideButtons.append(b)
-        }
-        let spacer = NSView(); spacer.translatesAutoresizingMaskIntoConstraints = false
-        side.addArrangedSubview(spacer)
-        let ver = NSTextField(labelWithString: "v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev")")
-        ver.font = .monospacedSystemFont(ofSize: 10, weight: .regular); ver.textColor = .tertiaryLabelColor
-        side.addArrangedSubview(ver)
-        split.addArrangedSubview(side)
-
-        contentHost = NSView()
-        contentHost.translatesAutoresizingMaskIntoConstraints = false
-        split.addArrangedSubview(contentHost)
-
-        w.contentView = split
-        side.heightAnchor.constraint(equalTo: split.heightAnchor).isActive = true
-        contentHost.heightAnchor.constraint(equalTo: split.heightAnchor).isActive = true
-        show(page)
-    }
-
-    func show(_ p: Page) {
-        page = p
-        for b in sideButtons { b.font = .systemFont(ofSize: 13, weight: b.tag == p.rawValue ? .semibold : .regular) }
-        contentHost.subviews.forEach { $0.removeFromSuperview() }
-        let v: NSView
-        switch p {
-        case .pet: v = buildPetPage()
-        case .tasks: tasksPage = tasksPage ?? TasksPage(frame: .zero); tasksPage!.build(); v = tasksPage!
-        case .space: spacePage = spacePage ?? StateSpacePage(frame: .zero); spacePage!.render(); v = spacePage!
-        }
-        v.translatesAutoresizingMaskIntoConstraints = false
-        contentHost.addSubview(v)
-        NSLayoutConstraint.activate([v.topAnchor.constraint(equalTo: contentHost.topAnchor), v.bottomAnchor.constraint(equalTo: contentHost.bottomAnchor),
-                                     v.leadingAnchor.constraint(equalTo: contentHost.leadingAnchor), v.trailingAnchor.constraint(equalTo: contentHost.trailingAnchor)])
-        UserDefaults.standard.set(p.rawValue, forKey: "ui.page")   // remember only once the page built fine
-        Log.w("app", "window page → \(p.title)")
+        let v = buildPetPage()
+        v.translatesAutoresizingMaskIntoConstraints = true
+        v.autoresizingMask = [.width, .height]
+        v.frame = w.contentView?.bounds ?? v.frame
+        w.contentView = v
     }
 
     /// The Pet page: everything that used to be the whole preferences window.
@@ -307,17 +213,6 @@ final class PreferencesWindow: NSWindowController, NSWindowDelegate {
         ])
         addTab(tabs, "Movement", move)
 
-        let workTab = grid([
-            ("", check("Change behaviour with my work state (from the State Space)", s.workAware) { S.workAware = $0 }),
-            ("On task: get out of the way", slider(s.focusStrength, 0, 1, fmt: { "\(Int($0 * 100))%" }) { v in S.focusStrength = v }),
-            ("Off task: get hyperactive", slider(s.hyperStrength, 0, 1, fmt: { "\(Int($0 * 100))%" }) { v in S.hyperStrength = v }),
-            ("React after", slider(s.distractDwell, 5, 300, fmt: { "\(Int($0)) s off task" }) { v in S.distractDwell = v }),
-            ("Check my work state every", slider(s.workCheckSeconds, 1, 30, fmt: { "\(Int($0)) s" }) { v in S.workCheckSeconds = v }),
-            ("Off task means", check("media & social windows (YouTube, Twitter…) and windows far from every note", !s.strictOffTask) { S.strictOffTask = !$0 }),
-            ("", check("Strict: any window not linked to a note", s.strictOffTask) { S.strictOffTask = $0 }),
-        ])
-        addTab(tabs, "Work", workTab)
-
         let phys = grid([
             ("Gravity", slider(s.gravity, 0.2, 1.5, fmt: { self.num($0) }) { v in S.gravity = v }),
             ("Bounciness", slider(s.bounciness, 0, 0.95, fmt: { self.num($0) }) { v in S.bounciness = v }),
@@ -339,23 +234,6 @@ final class PreferencesWindow: NSWindowController, NSWindowDelegate {
             ("", check("Airborne pose (flap, splay)", s.airPose) { S.airPose = $0 }),
         ])
         addTab(tabs, "Animations", anim)
-
-        let ctxText = NSTextField(wrappingLabelWithString: "…")
-        ctxText.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
-        ctxText.widthAnchor.constraint(equalToConstant: 400).isActive = true
-        contextLabel = ctxText
-        let ctxNote = NSTextField(wrappingLabelWithString: "What the pet knows about the window you're in right now. Window titles, documents and page URLs need Accessibility access (System Settings → Privacy & Security → Accessibility). Nothing leaves your Mac; changes are written to the log.")
-        ctxNote.textColor = .secondaryLabelColor
-        ctxNote.font = .systemFont(ofSize: 11)
-        ctxNote.widthAnchor.constraint(equalToConstant: 380).isActive = true
-        let ctxTab = grid([
-            ("Now", ctxText),
-            ("", bind(NSButton(title: Context.accessibilityGranted ? "Accessibility access granted ✓" : "Grant Accessibility access…", target: nil, action: nil)) { _ in Context.requestAccessibility() }),
-            ("State history", bind(NSButton(title: "Reveal state.jsonl", target: nil, action: nil)) { _ in NSWorkspace.shared.activateFileViewerSelecting([StateLog.url]) }),
-            ("", ctxNote),
-        ])
-        addTab(tabs, "Context", ctxTab)
-        startContextTimer()
 
         let loginOn = SMAppService.mainApp.status == .enabled
         let showAtLaunch = UserDefaults.standard.object(forKey: "showWindowAtLaunch") as? Bool ?? true

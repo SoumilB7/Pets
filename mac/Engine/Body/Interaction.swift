@@ -66,8 +66,7 @@ extension AppDelegate {
 
     func scheduleWander(soon: Bool = false) {
         let lo = S.wanderMin, hi = max(S.wanderMax, S.wanderMin)
-        var r = mood.stayOnMainWindow ? Double.random(in: 1.5...max(1.5, hi / 2)) : Double.random(in: lo...hi)
-        r = max(0.4, r * mood.wanderScale)
+        let r = S.stayOnMainWindow ? Double.random(in: 1.5...max(1.5, hi / 2)) : Double.random(in: lo...hi)
         nextWander = Date().addingTimeInterval(soon ? 1.0 : r)
     }
 

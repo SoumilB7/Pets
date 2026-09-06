@@ -86,13 +86,11 @@ extension AppDelegate {
                 "\(p.desc)\(exposedAnywhere(p, rects) ? "" : " (covered)")"
             }
             Log.w("scan", "\(visible.count) ledges: " + (visible.isEmpty ? "none" : visible.joined(separator: "; ")))
-            Mind.shared.windowChanged()
         }
         // you switched to another window: re-decide soon (see pickWanderTarget)
         if front?.id != lastFrontId {
             lastFrontId = front?.id
             Log.w("front", front.map { "now \($0.desc)" } ?? "none")
-            Mind.shared.windowChanged()
             if front != nil && tickCount > 60 {
                 frontChanged = true
                 nextWander = min(nextWander, Date().addingTimeInterval(0.8))

@@ -40,11 +40,7 @@ extension AppDelegate {
     func pickWanderTarget() {
         guard let here = standing else { return }
         let sc = screenAt(x)
-        let m = mood
-        let pinned = m.stayOnMainWindow
-        if m.hopChance > 0, Double.random(in: 0..<1) < m.hopChance, !here.isFloor || true {
-            vy = CGFloat.random(in: 6...9); selfJump = true; standing = nil; bounce = 0.25   // restless little hop
-        }
+        let pinned = S.stayOnMainWindow
         let strict = !pinned && S.homeZone != .anywhere && Double.random(in: 0..<1) < Double(S.stayHome) / 100
         let band = allowedBand(strict: strict)
 
@@ -62,22 +58,22 @@ extension AppDelegate {
         if pinned {
             dest = front                       // always head for the frontmost window
             how = front == nil ? "pinned but main window unusable/already here" : "pinned → main"
-        } else if justSwitched, let f = front, Double.random(in: 0..<1) < Double(max(m.pMain, m.name == "focused" ? 0 : 50)) / 100 {
+        } else if justSwitched, let f = front, Double.random(in: 0..<1) < Double(max(S.pMain, 50)) / 100 {
             dest = f                           // you switched windows: usually follow
             how = "focus changed → follow"
         } else {
             // weighted pick among destinations that exist right now
             var options: [(Double, Platform?)] = []
-            if let f = front { options.append((Double(m.pMain), f)) }
-            if let o = others.randomElement() { options.append((Double(m.pOther), o)) }
-            if let fl = floor { options.append((Double(m.pFloor), fl)) }
+            if let f = front { options.append((Double(S.pMain), f)) }
+            if let o = others.randomElement() { options.append((Double(S.pOther), o)) }
+            if let fl = floor { options.append((Double(S.pFloor), fl)) }
             var otherSpace: UInt64? = nil
-            if S.roamDesktops && Spaces.available && Date() >= nextDesktopMove && m.pSpace > 0 {
+            if S.roamDesktops && Spaces.available && Date() >= nextDesktopMove && S.pSpace > 0 {
                 otherSpace = Spaces.list().map { $0.id }.filter { $0 != petSpace }.randomElement()
-                if otherSpace != nil { options.append((Double(m.pSpace), nil)) }   // marker: last nil = "another desktop"
+                if otherSpace != nil { options.append((Double(S.pSpace), nil)) }   // marker: last nil = "another desktop"
             }
             let onYourWindow = frontWindow?.id == here.id
-            let stay = m.name == "focused" && onYourWindow ? 1.0 : max(5, Double(100 - m.pMain - m.pOther - m.pFloor - (otherSpace != nil ? m.pSpace : 0)))
+            let stay = max(5, Double(100 - S.pMain - S.pOther - S.pFloor - (otherSpace != nil ? S.pSpace : 0)))
             options.append((stay, nil))   // when you're working and it's on your window, staying is nearly off the table
             var r = Double.random(in: 0..<1) * options.reduce(0) { $0 + $1.0 }
             var picked = options.count - 1
@@ -90,7 +86,7 @@ extension AppDelegate {
                 return
             }
         }
-        Log.w("decide", "[\(m.name)] on \(here.desc) strict=\(strict) band=\(Log.f(band.lowerBound))-\(Log.f(band.upperBound)) front=\(frontWindow?.desc ?? "none") usableOthers=\(others.count) :: \(how) → \(dest?.desc ?? "wander along")")
+        Log.w("decide", "on \(here.desc) strict=\(strict) band=\(Log.f(band.lowerBound))-\(Log.f(band.upperBound)) front=\(frontWindow?.desc ?? "none") usableOthers=\(others.count) :: \(how) → \(dest?.desc ?? "wander along")")
 
         if let d = dest {
             if let tx = randomX(on: d, band: pinned ? allowedBand(strict: false) : band) {
@@ -102,7 +98,7 @@ extension AppDelegate {
 
         // wander along the current ledge, sometimes shyly toward the cursor
         var tx: CGFloat
-        if Double.random(in: 0..<1) < Double(m.cursorCuriosity) / 100 {
+        if Double.random(in: 0..<1) < Double(S.cursorCuriosity) / 100 {
             let m = NSEvent.mouseLocation
             let want = m.x - SPRITE_W / 2 + (m.x > x ? -50 : 50)
             tx = x + (want - x) * 0.5

@@ -9,10 +9,8 @@ from a 🐶 menu bar item. Built with plain `swiftc`, no Xcode project.
 pkill -x PixelPet     # stop
 ```
 
-The app window (Open PixelPet from the 🐾 menu) has three pages:
-**Pet** (all per-pet settings), **Tasks** (a board of sticky notes) and **State Space**
-(every window you use, embedded on-device and linked to the closest task; auto-updates on
-focus changes and every 5 minutes; optional mirror to Actian VectorAI DB).
+The app window (Open PixelPet from the 🐾 menu) holds every per-pet setting:
+General, Zone, Movement, Physics, Animations, App.
 
 ## Layout
 
@@ -21,7 +19,7 @@ agents), `Engine/` is behaviour split by role (`Sense`, `World`, `Brain`, `Body`
 `UI`, `Core`), `tools/` has the sprite previewer, icon builder and smoke test.
 
 ```
-tools/smoke.sh        # build, run 35 s, assert on the log and state stream
+tools/smoke.sh        # build, run 35 s, assert on the log
 ```
 
 See `DESIGN_BRIEF.md` for the design agent's instructions.

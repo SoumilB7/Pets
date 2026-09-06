@@ -35,49 +35,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var pendingDir = 1                 // +1 = leave via right edge, -1 = left
     var lastSpaceChange = Date.distantPast
     var lastMoving = false             // for state sampling
-    let work = WorkStateDetector()
-    var mood: Mood = Mood.neutral(PetSettings())
-
-    /// Re-evaluate the work state (once a second) and bend the pet's mood accordingly.
-    func updateWork() {
-        let s = S
-        let changed = work.evaluate(context: Context.current, now: Mind.shared.graph?.now, openTasks: TaskStore.shared.open.count,
-                                    threshold: Float(MindSettings.threshold), s: s)
-        let newMood: Mood
-        switch (s.workAware, work.current.state) {
-        case (true, .onTask): newMood = Mood.focused(s, k: s.focusStrength)
-        case (true, .offTask): newMood = Mood.distracted(s, k: s.hyperStrength)
-        default: newMood = Mood.neutral(s)
-        }
-        let moodChanged = newMood.name != mood.name
-        mood = newMood
-        if let c = changed {
-            Log.w("work", "\(c.rawValue): \(work.current.reason) → mood \(mood.name)")
-        }
-        if moodChanged {
-            syncMenu()
-            // whatever it was planning belonged to the old mood: drop it and decide afresh
-            pendingClimb = nil; pendingJump = nil; pendingSpace = nil
-            if standing != nil { targetX = x }
-            Log.w("mood", "\(mood.name): dropped pending plans, re-deciding")
-            switch mood.name {
-            case "distracted":
-                // come over right now and start bugging
-                if Spaces.available && petSpace != userSpace {
-                    let ci = Spaces.index(of: petSpace) ?? 0, ui = Spaces.index(of: userSpace) ?? 0
-                    arrive(at: userSpace, fromLeft: ui >= ci)
-                    Log.w("mood", "distracted → came to your desktop")
-                }
-                pendingSpace = nil
-                nextWander = Date().addingTimeInterval(0.5)
-            case "focused":
-                // leave soon
-                nextWander = Date().addingTimeInterval(2)
-                nextDesktopMove = min(nextDesktopMove, Date().addingTimeInterval(3))
-            default: break
-            }
-        }
-    }
 
     /// One word describing what the pet is doing right now (for the state log).
     var activity: String {
@@ -95,26 +52,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return lastMoving ? "walking" : "idle"
     }
 
-    /// Snapshot of the pet + user for the state stream.
     /// Every 10 s: where exactly is the pet (debugging aid for "it's stuck" reports).
     func logPosition() {
         let on = standing?.desc ?? (climb != nil ? "climbing #\(climb!.id)" : "air")
         Log.w("pos", "x=\(Log.f(x)) y=\(Log.f(y)) v=(\(String(format: "%.1f", vx)),\(String(format: "%.1f", vy))) target=\(Log.f(targetX)) on \(on) · \(activity) · desktop \(petSpace)\(pendingJump != nil ? " pendingJump" : "")\(pendingClimb != nil ? " pendingClimb" : "")\(pendingSpace != nil ? " pendingSpace" : "")")
     }
 
-    func sampleState() {
-        let c = Context.current
-        let u = UserState(desktop: userSpace, app: c.app, bundle: c.bundle, title: c.title, url: c.url, category: c.category.rawValue, idleSeconds: c.idleSeconds, work: work.current.state.rawValue)
-        var p = PetState()
-        p.desktop = petSpace
-        p.mode = mode.short
-        p.activity = activity
-        p.x = Int(x); p.y = Int(y)
-        if mode == .chill { p.ledgeOwner = "floor"; p.ledgeId = -1 }
-        else if let s = standing { p.ledgeOwner = s.isFloor ? "floor" : s.owner; p.ledgeId = s.id }
-        else if let cl = climb, let s = platforms.first(where: { $0.id == cl.id }) { p.ledgeOwner = s.owner; p.ledgeId = s.id }
-        StateLog.sample(user: u, pet: p, frontWindowId: frontWindow?.id)
-    }
     var nextDesktopMove = Date()       // desktop trips have their own, slower clock
     var lastIds: Set<Int> = []
     var frontChanged = false
@@ -211,21 +154,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         refreshPlatforms()
         standing = floorUnder()
         scheduleWander(soon: true)
-        Mind.shared.worldProvider = { [weak self] in
-            guard let self = self else { return MindWorld(context: ScreenContext(), frontPID: 0, frontWindowId: 0, desktop: 0, visible: []) }
-            var seen = Set<Int32>()
-            let vis = self.platforms.filter { !$0.isFloor && $0.pid > 0 }.compactMap { p -> (pid: Int32, app: String)? in
-                seen.insert(p.pid).inserted ? (p.pid, p.owner) : nil
-            }
-            return MindWorld(context: Context.current, frontPID: NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0,
-                             frontWindowId: self.frontWindow?.id ?? 0, desktop: self.userSpace, visible: vis)
-        }
-        Mind.shared.start()
-        Log.w("app", "accessibility granted: \(Context.accessibilityGranted)")
-        if !Context.accessibilityGranted {
-            // ask once per launch: macOS shows its own dialog and adds PixelPet to the list for the user to switch on
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { Context.requestAccessibility() }
-        }
         if mode != .normal { setMode(mode) }
         Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in self?.tick() }
 
@@ -320,8 +248,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         petMenu.submenu?.items.forEach { $0.state = $0.tag == Settings.shared.petIndex ? .on : .off }
         modeMenu.title = "Mode: \(mode.short)"
         modeMenu.submenu?.items.forEach { $0.state = $0.tag == mode.rawValue ? .on : .off }
-        statusItem.button?.title = mode == .chill ? "☕️" : (mode == .action ? "🫥" : mood.icon)
-        statusItem.button?.toolTip = "PixelPet · \(work.summary)"
+        statusItem.button?.title = mode == .chill ? "☕️" : (mode == .action ? "🫥" : "🐾")
+        statusItem.button?.toolTip = "PixelPet"
     }
 
     @objc func chooseMode(_ sender: NSMenuItem) { setMode(Mode(rawValue: sender.tag) ?? .normal) }

@@ -12,8 +12,6 @@ import Foundation
 //   space    desktops: where you are, where the pet is, trips
 //   scan     the set of visible windows changed (with covered ledges marked)
 //   front    your main window changed
-//   context  what you're doing (app, title, url, category)
-//   state    you-vs-pet state changed (also saved to state.jsonl)
 //   decide   a wander decision and the weights behind it
 //   travel   hop / climb / walk-to-take-off plans
 //   arrive   landed / climbed onto something
@@ -21,8 +19,6 @@ import Foundation
 //   throw    you threw it
 //   impact   hard hit → dizzy
 //   pos      position heartbeat every 10 s (x, y, ledge, activity)
-//   work     on task / off task / neutral transitions (with the note and score)
-//   mood     the pet's reaction to a work-state change
 //   warn     something unexpected but survivable
 //   crash    fatal signal / uncaught exception (last line of a bad run)
 
