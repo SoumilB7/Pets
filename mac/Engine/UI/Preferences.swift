@@ -238,6 +238,10 @@ final class PreferencesWindow: NSWindowController, NSWindowDelegate {
         let loginOn = SMAppService.mainApp.status == .enabled
         let showAtLaunch = UserDefaults.standard.object(forKey: "showWindowAtLaunch") as? Bool ?? true
         let appTab = grid([
+            ("", check("Pet active (off: only the screen saver shows the pet)", app?.petEnabled ?? true) { [weak self] on in self?.app?.setPetEnabled(on) }),
+            ("Screen saver", bind(NSButton(title: "Open Screen Saver settings…", target: nil, action: nil)) { _ in
+                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.ScreenSaver-Settings.extension")!)
+            }),
             ("", check("Show this window when PixelPet opens", showAtLaunch) { UserDefaults.standard.set($0, forKey: "showWindowAtLaunch") }),
             ("", check("Launch PixelPet at login", loginOn) { on in
                 do { if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() } }

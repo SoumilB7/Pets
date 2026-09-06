@@ -39,6 +39,10 @@ extension AppDelegate {
         t += 1.0 / 60.0
         tickCount += 1
         if tickCount % 600 == 0 && mode == .normal { logPosition() }   // position heartbeat every 10 s
+        if !petEnabled {                       // switched off: nothing on screen, nothing to do
+            if window.isVisible { window.orderOut(nil) }
+            return
+        }
         switch mode {
         case .action:
             if window.isVisible { window.orderOut(nil) }

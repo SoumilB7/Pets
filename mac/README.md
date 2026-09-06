@@ -6,8 +6,16 @@ from a 🐶 menu bar item. Built with plain `swiftc`, no Xcode project.
 ```
 ./run.sh              # build the .app bundle into build/ and (re)launch it
 ./install.sh          # build + copy to /Applications and launch
+./install-saver.sh    # build PixelPet.saver and install it for this user
 pkill -x PixelPet     # stop
 ```
+
+## Screen saver
+
+`Saver/` builds `PixelPet.saver`: your wallpaper with the selected pet wandering along the
+bottom. It reads the same pet choice and per-pet settings as the app and works with the
+app switched off ("Pet active" in the menu bar). `tools/test-saver.sh` renders one frame
+headlessly to `build/saver-frame.png`.
 
 The app window (Open PixelPet from the 🐾 menu) holds every per-pet setting:
 General, Zone, Movement, Physics, Animations, App.

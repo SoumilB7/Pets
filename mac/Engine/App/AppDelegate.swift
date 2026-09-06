@@ -17,6 +17,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
     var prefs: PreferencesWindow?
     var modeMenu: NSMenuItem!
+    var activeItem: NSMenuItem!
+
+    /// Off = the pet disappears and the app idles; only the menu-bar icon stays so you can
+    /// switch it back on. The screen saver is separate and keeps working either way.
+    var petEnabled: Bool {
+        get { UserDefaults.standard.object(forKey: "petEnabled") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "petEnabled") }
+    }
+    func setPetEnabled(_ on: Bool) {
+        petEnabled = on
+        Log.w("app", on ? "pet switched on" : "pet switched off (screen saver only)")
+        if on { scheduleWander(soon: true) } else { window.orderOut(nil) }
+        syncMenu()
+        prefs?.rebuild()
+    }
+    @objc func togglePet() { setPetEnabled(!petEnabled) }
     var petMenu: NSMenuItem!
 
     // ---- motion state (x,y = bottom-left of the sprite, AppKit screen coords) ----
@@ -224,6 +240,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         petMenu.submenu = petSub
         menu.addItem(petMenu)
+        activeItem = NSMenuItem(title: "Pet active", action: #selector(togglePet), keyEquivalent: "")
+        activeItem.target = self
+        menu.addItem(activeItem)
         modeMenu = NSMenuItem(title: "Mode", action: nil, keyEquivalent: "")
         let sub = NSMenu()
         for m in Mode.allCases {
@@ -248,7 +267,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         petMenu.submenu?.items.forEach { $0.state = $0.tag == Settings.shared.petIndex ? .on : .off }
         modeMenu.title = "Mode: \(mode.short)"
         modeMenu.submenu?.items.forEach { $0.state = $0.tag == mode.rawValue ? .on : .off }
-        statusItem.button?.title = mode == .chill ? "☕️" : (mode == .action ? "🫥" : "🐾")
+        activeItem.state = petEnabled ? .on : .off
+        statusItem.button?.title = !petEnabled ? "💤" : (mode == .chill ? "☕️" : (mode == .action ? "🫥" : "🐾"))
         statusItem.button?.toolTip = "PixelPet"
     }
 

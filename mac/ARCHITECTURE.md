@@ -30,10 +30,15 @@ mac/
 │   └── UI/
 │       ├── Render.swift         PetView: draws a PetSprite frame
 │       └── Preferences.swift    the app window (tabs of per-pet settings)
+├── Saver/                   the screen saver (same Design/ + settings model, own view)
+│   ├── PetSaverView.swift   wallpaper + pet on the floor: wander, hop, blink, nap
+│   ├── Globals.swift        the `pet` global the settings code expects
+│   └── Info.plist
 ├── tools/
 │   ├── preview.py               terminal preview + width check for sprites
 │   ├── make-icon.py             renders the dog into AppIcon.icns
-│   └── smoke.sh                 build → launch → assert on the log
+│   ├── smoke.sh                 build → launch → assert on the log
+│   └── test-saver.sh            load PixelPet.saver headlessly, render a frame
 ├── build-app.sh                 assemble build/PixelPet.app
 ├── run.sh                       build + relaunch (dev loop)
 └── install.sh                   build + copy to /Applications + launch
